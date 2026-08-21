@@ -1,7 +1,8 @@
 # QuMail — Quantum-Secured Email Client
 
 **Smart India Hackathon 2026 · Team CodexQuantum**
-Problem Statement SIH260004 · Indian Space Research Organisation (ISRO)
+
+Problem Statement (Internal Selection Hackathon)SIH260004 · Indian Space Research Organisation (ISRO)
 
 QuMail is an email client that integrates Quantum Key Distribution (QKD)
 with existing email infrastructure — Gmail, Yahoo, and other standard
