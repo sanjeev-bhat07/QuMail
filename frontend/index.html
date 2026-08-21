@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QuMail — Quantum-Secured Email Client</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #2a2f3a;
+    --text: #e6e8ec; --muted: #8b93a3; --accent: #4f8cff;
+    --l1: #6b7280; --l2: #f5a524; --l3: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; margin: 0; }
+  .keybank { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .keybank .count { color: var(--text); font-weight: 600; }
+  .bar { width: 120px; height: 6px; background: #2a2f3a; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); transition: width .3s; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .panel h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input, textarea, select { width: 100%; padding: 8px 10px; background: #0f1115; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; font-size: 13px; }
+  textarea { min-height: 90px; resize: vertical; }
+  .levels { display: flex; gap: 8px; margin-top: 6px; }
+  .level-btn { flex: 1; padding: 10px 6px; border-radius: 6px; border: 1px solid var(--border); background: #0f1115; cursor: pointer; font-size: 12px; text-align: center; color: var(--muted); }
+  .level-btn.active[data-lvl="1"] { border-color: var(--l1); color: var(--l1); background: #1a1c22; }
+  .level-btn.active[data-lvl="2"] { border-color: var(--l2); color: var(--l2); background: #241d10; }
+  .level-btn.active[data-lvl="3"] { border-color: var(--l3); color: var(--l3); background: #10251a; }
+  button.primary { margin-top: 14px; width: 100%; padding: 10px; background: var(--accent); border: none; border-radius: 6px; color: white; font-weight: 600; cursor: pointer; font-size: 13px; }
+  button.primary:hover { opacity: .9; }
+  .status-msg { margin-top: 10px; font-size: 12px; padding: 8px 10px; border-radius: 6px; }
+  .status-msg.ok { background: #10251a; color: var(--l3); }
+  .status-msg.err { background: #2a1414; color: #f87171; }
+  .status-msg.info { background: #1a1e2a; color: var(--accent); }
+  .msg-item { padding: 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; font-size: 13px; }
+  .msg-item .badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+  .badge.l1 { background: #2a2d33; color: var(--l1); }
+  .badge.l2 { background: #241d10; color: var(--l2); }
+  .badge.l3 { background: #10251a; color: var(--l3); }
+  .msg-item .sub { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  #refresh-inbox { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-bottom: 12px; }
+  .msg-item { cursor: pointer; transition: border-color .15s; }
+  .msg-item:hover { border-color: var(--accent); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); align-items: center; justify-content: center; z-index: 50; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 22px; width: 480px; max-width: 90vw; max-height: 80vh; overflow-y: auto; }
+  .modal h3 { margin: 0 0 4px; font-size: 16px; }
+  .modal .modal-sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .modal .modal-body { background: #0f1115; border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 13px; white-space: pre-wrap; word-break: break-word; min-height: 60px; }
+  .modal .modal-close { margin-top: 16px; width: 100%; padding: 8px; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; cursor: pointer; }
+  .modal .decrypt-err { color: #f87171; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📧 QuMail</h1>
+  <div class="keybank">
+    Quantum key bank:
+    <span class="count" id="key-count">–/–</span>
+    <div class="bar"><div class="bar-fill" id="key-bar" style="width:0%"></div></div>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>Compose</h2>
+    <label>To</label>
+    <input id="to" type="email" placeholder="recipient@gmail.com">
+    <label>Subject</label>
+    <input id="subject" type="text" placeholder="Subject">
+    <label>Message</label>
+    <textarea id="body" placeholder="Write your message..."></textarea>
+    <label>Attachment (optional)</label>
+    <input id="attachment" type="file">
+    <label>Security Level</label>
+    <div class="levels">
+      <div class="level-btn active" data-lvl="1" onclick="selectLevel(1)">L1<br><small>No Quantum</small></div>
+      <div class="level-btn" data-lvl="2" onclick="selectLevel(2)">L2<br><small>Quantum-AES</small></div>
+      <div class="level-btn" data-lvl="3" onclick="selectLevel(3)">L3<br><small>OTP</small></div>
+    </div>
+    <button class="primary" onclick="sendMail()">Send</button>
+    <div id="send-status"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Inbox</h2>
+    <button id="refresh-inbox" onclick="loadInbox()">↻ Refresh</button>
+    <div id="inbox-list"><p style="color:var(--muted);font-size:13px;">Click refresh to load messages.</p></div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <h3 id="modal-subject"></h3>
+    <div class="modal-sub" id="modal-meta"></div>
+    <div class="modal-body" id="modal-body">Decrypting...</div>
+    <div class="decrypt-err" id="modal-err"></div>
+    <button class="modal-close" id="modal-download" style="display:none;background:var(--accent);color:white;border:none;margin-top:10px;">⬇ Download attachment</button>
+    <button class="modal-close" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:8000";
+let selectedLevel = 1;
+
+function selectLevel(lvl) {
+  selectedLevel = lvl;
+  document.querySelectorAll('.level-btn').forEach(b => b.classList.toggle('active', +b.dataset.lvl === lvl));
+}
+
+async function refreshKeyStatus() {
+  try {
+    const r = await fetch(`${API}/api/key-status`);
+    const d = await r.json();
+    document.getElementById('key-count').textContent = `${d.stored_key_count}/${d.max_key_count}`;
+    document.getElementById('key-bar').style.width = `${(d.stored_key_count / d.max_key_count) * 100}%`;
+  } catch (e) {
+    document.getElementById('key-count').textContent = 'KM offline';
+  }
+}
+
+async function sendMail() {
+  const statusEl = document.getElementById('send-status');
+  statusEl.innerHTML = '';
+
+  const formData = new FormData();
+  formData.append('to', document.getElementById('to').value);
+  formData.append('subject', document.getElementById('subject').value);
+  formData.append('body', document.getElementById('body').value);
+  formData.append('security_level', selectedLevel);
+
+  const fileInput = document.getElementById('attachment');
+  if (fileInput.files.length > 0) {
+    formData.append('attachment', fileInput.files[0]);
+  }
+
+  try {
+    const r = await fetch(`${API}/api/compose`, {
+      method: 'POST',
+      body: formData,  // browser sets multipart Content-Type + boundary automatically
+    });
+    const d = await r.json();
+    if (r.ok) {
+      if (d.status === 'sent') {
+        const attNote = d.attachment_key_id ? `, attachment key ${d.attachment_key_id.slice(0,8)}...` : '';
+        statusEl.innerHTML = `<div class="status-msg ok">Sent via Gmail — Level ${d.security_level}${d.key_id ? ', key ' + d.key_id.slice(0,8) + '...' : ''}${attNote}</div>`;
+      } else {
+        const preview = JSON.stringify(d.payload_preview, null, 2);
+        statusEl.innerHTML = `
+          <div class="status-msg info">Encrypted OK — Gmail not configured, so this wasn't sent, but here's the actual encryption pipeline output:</div>
+          <pre style="margin-top:8px; padding:10px; background:#0a0b0e; border:1px solid var(--border); border-radius:6px; font-size:11px; overflow-x:auto; color:#a5d6ff;">${preview}</pre>
+        `;
+      }
+    } else {
+      statusEl.innerHTML = `<div class="status-msg err">${d.detail}</div>`;
+    }
+    refreshKeyStatus();
+  } catch (e) {
+    statusEl.innerHTML = `<div class="status-msg err">Backend unreachable: ${e}</div>`;
+  }
+}
+
+async function loadInbox() {
+  const listEl = document.getElementById('inbox-list');
+  listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Loading...</p>';
+  try {
+    const r = await fetch(`${API}/api/inbox`);
+    if (!r.ok) {
+      const d = await r.json();
+      listEl.innerHTML = `<p style="color:#f87171;font-size:13px;">${d.detail}</p>`;
+      return;
+    }
+    const msgs = await r.json();
+    if (msgs.length === 0) {
+      listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">No messages found.</p>';
+      return;
+    }
+    window._qumailMessages = msgs;  // stash for click lookup
+    listEl.innerHTML = msgs.map((m, i) => {
+      const lvl = m.qumail_payload ? m.qumail_payload.security_level : null;
+      const badge = lvl ? `<span class="badge l${lvl}">L${lvl}</span>` : `<span class="badge l1">plain</span>`;
+      return `<div class="msg-item" onclick="openMessage(${i})"><strong>${m.subject}</strong>${badge}<div class="sub">${m.from}</div></div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = `<p style="color:#f87171;font-size:13px;">Backend unreachable: ${e}</p>`;
+  }
+}
+
+async function openMessage(index) {
+  const m = window._qumailMessages[index];
+  document.getElementById('modal-subject').textContent = m.subject;
+  document.getElementById('modal-meta').textContent = `From: ${m.from}`;
+  document.getElementById('modal-body').textContent = 'Decrypting...';
+  document.getElementById('modal-err').textContent = '';
+  document.getElementById('modal-overlay').classList.add('open');
+
+  const downloadBtn = document.getElementById('modal-download');
+  downloadBtn.style.display = 'none';
+  downloadBtn.onclick = null;
+
+  if (!m.qumail_payload) {
+    const plainBody = (m.body || '').trim();
+    document.getElementById('modal-body').textContent = plainBody
+      ? plainBody
+      : '(No readable body content found for this message.)';
+    return;
+  }
+
+  const payload = m.qumail_payload;
+  const keyId = payload.key_id || 'none';
+
+  try {
+    const r = await fetch(`${API}/api/decrypt/${keyId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      document.getElementById('modal-body').textContent = d.plaintext;
+    } else {
+      document.getElementById('modal-body').textContent = '(Could not decrypt)';
+      document.getElementById('modal-err').textContent = d.detail || 'Unknown error';
+    }
+  } catch (e) {
+    document.getElementById('modal-body').textContent = '(Could not decrypt)';
+    document.getElementById('modal-err').textContent = `Backend unreachable: ${e}`;
+  }
+
+  if (payload.attachment) {
+    downloadBtn.style.display = 'block';
+    downloadBtn.textContent = `⬇ Download ${payload.attachment.filename} (${payload.attachment.size}B)`;
+    downloadBtn.onclick = async () => {
+      downloadBtn.textContent = 'Decrypting attachment...';
+      try {
+        const r = await fetch(`${API}/api/decrypt-attachment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload.attachment),
+        });
+        if (!r.ok) {
+          const d = await r.json();
+          document.getElementById('modal-err').textContent = d.detail || 'Attachment decrypt failed';
+          downloadBtn.textContent = `⬇ Download ${payload.attachment.filename} (failed)`;
+          return;
+        }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = payload.attachment.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        downloadBtn.textContent = `⬇ Download ${payload.attachment.filename} (${payload.attachment.size}B)`;
+      } catch (e) {
+        document.getElementById('modal-err').textContent = `Backend unreachable: ${e}`;
+      }
+    };
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+refreshKeyStatus();
+setInterval(refreshKeyStatus, 5000);
+</script>
+
+</body>
+</html>
